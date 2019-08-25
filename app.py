@@ -6,7 +6,7 @@ import os
 import eventlet
 import uuid
 
-#eventlet.monkey_patch(socket=False,thread=False)
+eventlet.monkey_patch(socket=False)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ['FLASK_SECRET_KEY']
