@@ -1,4 +1,4 @@
-from flask import Flask, render_template, copy_current_request_context, session
+from flask import Flask, render_template, send_from_directory
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from twython_stream import TwitterStream
 from eventlet.green import threading
@@ -25,6 +25,11 @@ def consume_tweet(t):
 stream = TwitterStream(consumer_key, consumer_secret, token, token_secret, consume_tweet)
 
 threading.Thread(target=stream.statuses.sample, daemon=True).start()    
+
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory(os.path.join(app.root_path, 'static'),
+                               'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
 @app.route('/')
 def index():
