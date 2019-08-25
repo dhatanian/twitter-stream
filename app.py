@@ -1,12 +1,15 @@
 from flask import Flask, render_template, copy_current_request_context
 from flask_socketio import SocketIO, emit
 from twython_stream import TwitterStream
-from threading import Thread
+from eventlet.green import threading
 import os
+import eventlet
+
+#eventlet.monkey_patch(socket=False,thread=False)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ['FLASK_SECRET_KEY']
-socketio = SocketIO(app)
+socketio = SocketIO(app=app,async_mode='eventlet')
 
 @app.route('/')
 def index():
@@ -27,10 +30,11 @@ def test_connect():
         if 'place' in t and t['place'] is not None:
             print('Sending tweet')
             emit('tweet', t['place'])
+        eventlet.sleep(0.001)
 
     print('Client connected')
     emit('my response', {'data': 'Connected'})
-    Thread(target=stream_tweets, daemon=True).start()    
+    threading.Thread(target=stream_tweets, daemon=True).start()    
 
 @socketio.on('disconnect')
 def test_disconnect():
