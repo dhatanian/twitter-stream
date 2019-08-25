@@ -1,0 +1,102 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+    <title>Flask-SocketIO Test</title>
+    <script src="//code.jquery.com/jquery-1.12.4.min.js" integrity="sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ=" crossorigin="anonymous"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/socket.io/2.2.0/socket.io.js" integrity="sha256-yr4fRk/GU1ehYJPAs8P4JlTgu0Hdsp4ZKrx8bDEDC3I=" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://cdn.rawgit.com/openlayers/openlayers.github.io/master/en/v5.3.0/css/ol.css" type="text/css">
+    <script src="https://cdn.rawgit.com/openlayers/openlayers.github.io/master/en/v5.3.0/build/ol.js"></script>
+    <script type="text/javascript" charset="utf-8">
+        $(document).ready(function() {
+            var socket = io();
+
+            socket.on('connect', function() {
+                console.log("Connected");
+            });
+
+            var map = new ol.Map({
+                target: 'map',
+                layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.OSM({
+                            wrapX: false
+                        })
+                })
+                ],
+                controls: [],
+                view: new ol.View({
+                    center: [0, 0],
+                    zoom: 1
+                })
+            });
+            map.interactions.clear();
+
+            var source = new ol.source.Vector({
+                wrapX: false
+            });
+            var vector = new ol.layer.Vector({
+                source: source
+            });
+            map.addLayer(vector);
+
+            var duration = 3000;
+            function flash(feature) {
+                var start = new Date().getTime();
+                var listenerKey = map.on('postcompose', animate);
+
+                function animate(event) {
+                var vectorContext = event.vectorContext;
+                var frameState = event.frameState;
+                var flashGeom = feature.getGeometry().clone();
+                var elapsed = frameState.time - start;
+                var elapsedRatio = elapsed / duration;
+                // radius will be 5 at start and 30 at end.
+                var radius = ol.easing.easeOut(elapsedRatio) * 25 + 5;
+                var opacity = ol.easing.easeOut(1 - elapsedRatio);
+
+                var style = new ol.style.Style({
+                    image: new ol.style.Circle({
+                    radius: radius,
+                    stroke: new ol.style.Stroke({
+                        color: 'rgba(255, 0, 0, ' + opacity + ')',
+                        width: 0.25 + opacity
+                    })
+                    })
+                });
+
+                vectorContext.setStyle(style);
+                vectorContext.drawGeometry(flashGeom);
+                if (elapsed > duration) {
+                    ol.Observable.unByKey(listenerKey);
+                    return;
+                }
+                // tell OpenLayers to continue postcompose animation
+                map.render();
+                }
+            }
+
+            source.on('addfeature', function(e) {
+                flash(e.feature);
+            });
+
+            socket.on('tweet', function(msg) {
+                if(msg.bounding_box && msg.bounding_box.type === "Polygon"){
+                    let polygonCoordinates = msg.bounding_box.coordinates[0];
+                    let transposedCoordinates = polygonCoordinates[0].map((col, i) => polygonCoordinates.map(row => row[i]));
+                    let centerCoordinates = transposedCoordinates.map(values => values.reduce((a,b) => a + b, 0) / values.length);
+                    $('#log').append('<br>Got a tweet from ' + msg.name );
+                    var geom = new ol.geom.Point(ol.proj.fromLonLat([centerCoordinates[0], centerCoordinates[1]]));
+                    var feature = new ol.Feature(geom);
+                    source.addFeature(feature);
+                }
+            });
+
+        });
+    </script>
+</head>
+<body>
+    <h1>Twitter API, Flask-SocketIO and OpenLayers API</h1>
+    <div id="map" class="map"></div>
+    <div id="log"></div>
+</body>
+</html>
